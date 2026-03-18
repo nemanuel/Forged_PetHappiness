@@ -18,6 +18,7 @@ A lightweight Forged WoW addon that improves Hunter pet status tracking through 
   - Green = positive
 - Pet diet icon with tooltip
 - Help icon with command tooltip
+- Left-click help icon to open the character pet tab
 - Draggable frame
 - Lock/unlock support
 - Show/hide support
@@ -29,10 +30,11 @@ A lightweight Forged WoW addon that improves Hunter pet status tracking through 
 2. Copy the addon folder to:
    - `World of Warcraft/Interface/AddOns/Forged_PetHappiness`
 3. Ensure these files are inside that folder:
-  - `Forged_PetHappiness_Utils.lua`
-  - `Forged_PetHappiness_Diet.lua`
+  - `utils.lua`
+  - `diet.lua`
+  - `core.lua`
    - `Forged_PetHappiness.toc`
-   - `Forged_PetHappiness.lua`
+  - `README.md` (optional)
 4. Start WoW and enable **Forged Pet Happiness** in AddOns at character select.
 
 ## Usage
@@ -46,6 +48,7 @@ Slash commands:
 - `/fph reset` — reset frame position to default
 - `/fph hide` — hide frame
 - `/fph show` — show frame (re-centers to default)
+- `/fph pet` — open character pet tab
 
 ## Vanilla/Forged Limitations
 
@@ -54,4 +57,4 @@ When data is unavailable, the addon falls back to safe placeholders such as `Unk
 
 ## Version
 
-`0.1.0`
+`1.0.3`

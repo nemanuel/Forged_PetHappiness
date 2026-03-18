@@ -2,7 +2,7 @@
 ## Title: |cfff07d30Forged|r Pet Happiness
 ## Notes: Frame that shows hunters pet status
 ## Author: Chromag
-## Version: 1.0.2
+## Version: 1.0.3
 ## Website: https://forgedworlds.com
 ## Email: chromag@forgedworlds.com
 ## LoadOnDemand: 0

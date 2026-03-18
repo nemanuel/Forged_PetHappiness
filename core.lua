@@ -556,7 +556,8 @@ end
 local function ToggleLock(locked)
     db.locked = locked
     SyncBackupDb()
-    mainframe:EnableMouse(not locked)
+    -- Keep mouse enabled so icon buttons remain clickable even while locked.
+    mainframe:EnableMouse(true)
 
     if locked then
         happinessBarText:SetTextColor(1, 1, 1)
@@ -580,6 +581,53 @@ local function ToggleLock(locked)
         if loyaltyInfoText then
             loyaltyInfoText:SetTextColor(0.8, 0.95, 1)
         end
+    end
+end
+
+local function OpenPetInfoTab()
+    if not UnitExists("pet") then
+        print("Forged Pet Happiness: no active pet to show.")
+        return
+    end
+
+    if ToggleCharacter then
+        ToggleCharacter("PetPaperDollFrame")
+    end
+
+    if CharacterFrame then
+        if ShowUIPanel then
+            ShowUIPanel(CharacterFrame)
+        else
+            CharacterFrame:Show()
+        end
+    end
+
+    if CharacterFrame_ShowSubFrame then
+        CharacterFrame_ShowSubFrame("PetPaperDollFrame")
+    end
+
+    if CharacterFrameTab2 and CharacterFrameTab2.Click then
+        CharacterFrameTab2:Click()
+    elseif CharacterFrameTab3 and CharacterFrameTab3.Click then
+        CharacterFrameTab3:Click()
+    elseif CharacterFrameTab4 and CharacterFrameTab4.Click then
+        CharacterFrameTab4:Click()
+    end
+
+    if not CharacterFrame_ShowSubFrame and not CharacterFrameTab2 then
+        print("Forged Pet Happiness: unable to open pet tab on this client.")
+    end
+end
+
+local function HandleHelpIconClick(button)
+    if button and button ~= "LeftButton" then
+        return
+    end
+
+    OpenPetInfoTab()
+
+    if GameTooltip and helpIconFrame and GameTooltip:IsOwned(helpIconFrame) then
+        GameTooltip:Hide()
     end
 end
 
@@ -770,13 +818,14 @@ local function InitializeAddon()
     petDietIconTexture:SetTexture("Interface\\Icons\\INV_Misc_Food_15")
     petDietIconFrame:Show()
 
-    helpIconFrame = CreateFrame("Frame", nil, mainframe)
+    helpIconFrame = CreateFrame("Button", nil, mainframe)
     helpIconFrame:SetPoint("TOPRIGHT", mainframe, "TOPRIGHT", -7, -8)
     helpIconFrame:SetWidth(16)
     helpIconFrame:SetHeight(16)
     helpIconFrame:SetFrameStrata(mainframe:GetFrameStrata())
     helpIconFrame:SetFrameLevel(mainframe:GetFrameLevel() + 1)
     helpIconFrame:EnableMouse(true)
+    helpIconFrame:RegisterForClicks("AnyUp", "AnyDown")
 
     helpIconFrame:SetScript("OnEnter", function()
         if not GameTooltip then
@@ -784,9 +833,18 @@ local function InitializeAddon()
         end
 
         GameTooltip:SetOwner(helpIconFrame, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Commands")
-        GameTooltip:AddLine("/fph [lock, unlock, reset, hide, show]", 1, 1, 1, true)
+        GameTooltip:SetText("Help")
+        GameTooltip:AddLine("Left-click: open character pet tab", 0.8, 0.95, 1, true)
+        GameTooltip:AddLine("/fph [lock, unlock, reset, hide, show, pet]", 1, 1, 1, true)
         GameTooltip:Show()
+    end)
+
+    helpIconFrame:SetScript("OnClick", function(_, button)
+        HandleHelpIconClick(button)
+    end)
+
+    helpIconFrame:SetScript("OnMouseUp", function(_, button)
+        HandleHelpIconClick(button)
     end)
 
     helpIconFrame:SetScript("OnLeave", function()
@@ -869,8 +927,10 @@ local function InitializeAddon()
             ApplyPosition()
             mainframe:Show()
             print("Forged Pet Happiness: shown at center")
+        elseif input == "pet" then
+            OpenPetInfoTab()
         else
-            print("Forged Pet Happiness commands: /fph lock, /fph unlock, /fph reset, /fph hide, /fph show")
+            print("Forged Pet Happiness commands: /fph lock, /fph unlock, /fph reset, /fph hide, /fph show, /fph pet")
         end
     end
 
