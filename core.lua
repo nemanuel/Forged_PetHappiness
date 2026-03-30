@@ -62,6 +62,15 @@ local hasPet = false
 local initialized = false
 local db
 local backupDb
+local feedEffectText
+local feedEffectActive = false
+local feedEffectSwapInterval = 1
+local feedEffectStartedAt = 0
+local FirstPatternCapture
+local IsFeedEffectFadeMessage
+local GetCurrentHappinessBarText
+local UpdateHappinessBarText
+local UpdateVisual
 
 local function GetCharacterKey()
     local playerName = UnitName and UnitName("player") or nil
@@ -108,7 +117,114 @@ local function UpdateBarColor()
     end
 end
 
-local function FirstPatternCapture(text, pattern)
+local function ClearFeedEffectOverride()
+    feedEffectText = nil
+    feedEffectActive = false
+    feedEffectStartedAt = 0
+end
+
+local function SetFeedEffectOverride(effectText)
+    if type(effectText) ~= "string" or effectText == "" then
+        return
+    end
+
+    feedEffectText = effectText
+    feedEffectActive = true
+    if GetTime then
+        local now = GetTime()
+        if type(now) == "number" then
+            feedEffectStartedAt = now
+        else
+            feedEffectStartedAt = 0
+        end
+    else
+        feedEffectStartedAt = 0
+    end
+end
+
+local function GetFeedEffectOverride()
+    if not feedEffectActive or type(feedEffectText) ~= "string" or feedEffectText == "" then
+        return nil
+    end
+
+    return feedEffectText
+end
+
+local function NormalizeFeedEffectAmount(rawAmount)
+    local amount = tonumber(rawAmount)
+    if type(amount) ~= "number" or amount == 0 then
+        return nil
+    end
+
+    if amount > 0 then
+        return string.format("+%d", amount)
+    end
+
+    return string.format("%d", amount)
+end
+
+local function ExtractFeedEffectAmount(message)
+    if type(message) ~= "string" or message == "" then
+        return nil
+    end
+
+    local directFeedEffectAmount = FirstPatternCapture(message,
+        "gains%s+([%+%-]?%d+)%s+Happin+e?s?s?%s+from%s+Feed%s+Pet%s+Effect%.?")
+    if directFeedEffectAmount then
+        return NormalizeFeedEffectAmount(directFeedEffectAmount)
+    end
+
+    local messageLower = string.lower(message)
+    local mentionsPet = string.find(messageLower, "pet", 1, true) ~= nil
+    local mentionsFeeding = string.find(messageLower, "feed", 1, true) ~= nil or
+        string.find(messageLower, "eat", 1, true) ~= nil or
+        string.find(messageLower, "happiness", 1, true) ~= nil or
+        string.find(messageLower, "happinness", 1, true) ~= nil
+
+    if not mentionsPet or not mentionsFeeding then
+        return nil
+    end
+
+    local signedAmount = FirstPatternCapture(message, "([+-]%d+)")
+    if signedAmount then
+        return NormalizeFeedEffectAmount(signedAmount)
+    end
+
+    local unsignedAmount = FirstPatternCapture(message, "(%d+)")
+    if unsignedAmount then
+        return NormalizeFeedEffectAmount(unsignedAmount)
+    end
+
+    return nil
+end
+
+IsFeedEffectFadeMessage = function(message)
+    if type(message) ~= "string" or message == "" then
+        return false
+    end
+
+    local messageLower = string.lower(message)
+    return string.find(messageLower, "feed pet effect fades", 1, true) ~= nil or
+        string.find(messageLower, "feed pet effect fades from", 1, true) ~= nil
+end
+
+local function HandleFeedEffectChatMessage(message)
+    if IsFeedEffectFadeMessage(message) then
+        ClearFeedEffectOverride()
+        UpdateHappinessBarText()
+        return
+    end
+
+    local effectAmount = ExtractFeedEffectAmount(message)
+    if not effectAmount then
+        return
+    end
+
+    SetFeedEffectOverride(string.format("%s Feed Pet Effect", effectAmount))
+    UpdateHappinessBarText()
+end
+
+FirstPatternCapture = function(text, pattern)
     if type(text) ~= "string" then
         return nil
     end
@@ -390,7 +506,53 @@ ResolveTrainingPointsValue = function(primaryValue, secondaryValue)
     return nil
 end
 
-local function UpdateVisual()
+GetCurrentHappinessBarText = function(state, stateText)
+    local activeFeedEffectText = GetFeedEffectOverride()
+    if activeFeedEffectText then
+        if GetTime then
+            local now = GetTime()
+            if type(now) == "number" then
+                local elapsed = now - (feedEffectStartedAt or 0)
+                if elapsed < 0 then
+                    elapsed = 0
+                end
+
+                local phase = math.floor(elapsed / feedEffectSwapInterval)
+                if math.mod(phase, 2) == 0 then
+                    return activeFeedEffectText
+                end
+            end
+        else
+            return activeFeedEffectText
+        end
+    end
+
+    if state == 1 or state == 2 or state == 3 then
+        return string.format("Happiness (%s)", stateText)
+    end
+
+    return "Happiness N/A"
+end
+
+UpdateHappinessBarText = function()
+    if not happinessBarText then
+        return
+    end
+
+    local state = happinessValue
+    local stateText = "No Pet"
+    if state == 3 then
+        stateText = "Happy"
+    elseif state == 2 then
+        stateText = "Content"
+    elseif state == 1 then
+        stateText = "Unhappy"
+    end
+
+    happinessBarText:SetText(GetCurrentHappinessBarText(state, stateText))
+end
+
+UpdateVisual = function()
     if not happinessBar or not happinessBarText or not petXpBar or not petXpBarText or not petInfoText or
         not loyaltyInfoText or not petTrainingPointsLabelText or not petTrainingPointsText then
         return
@@ -408,14 +570,6 @@ local function UpdateVisual()
     end
 
     local state = happinessValue
-    local stateText = "No Pet"
-    if state == 3 then
-        stateText = "Happy"
-    elseif state == 2 then
-        stateText = "Content"
-    elseif state == 1 then
-        stateText = "Unhappy"
-    end
 
     if UnitExists("pet") then
         local petLevel = UnitLevel("pet")
@@ -518,11 +672,7 @@ local function UpdateVisual()
         petXpBarText:SetText("XP N/A")
     end
 
-    if state == 1 or state == 2 or state == 3 then
-        happinessBarText:SetText(string.format("Happiness (%s)", stateText))
-    else
-        happinessBarText:SetText("Happiness N/A")
-    end
+    UpdateHappinessBarText()
 end
 
 local function SyncToGameState(forceSnap)
@@ -539,6 +689,7 @@ local function SyncToGameState(forceSnap)
 
     if not hasPet then
         happinessValue = 0
+        ClearFeedEffectOverride()
         UpdateVisual()
         return
     end
@@ -886,6 +1037,11 @@ local function InitializeAddon()
         mainframe:StopMovingOrSizing()
         SavePosition()
     end)
+    mainframe:SetScript("OnUpdate", function()
+        if feedEffectActive then
+            UpdateHappinessBarText()
+        end
+    end)
 
     ApplyPosition()
     if db.hidden then
@@ -955,6 +1111,7 @@ mainframe:SetScript("OnEvent", function(self, evt, a1)
     elseif evt == "UNIT_HAPPINESS" then
         SyncToGameState(false)
     elseif evt == "UNIT_PET" and a1 == "player" then
+        ClearFeedEffectOverride()
         SyncToGameState(true)
     elseif evt == "UNIT_PET_EXPERIENCE" then
         if not a1 or a1 == "pet" then
@@ -964,6 +1121,13 @@ mainframe:SetScript("OnEvent", function(self, evt, a1)
         SyncToGameState(false)
     elseif evt == "CHAT_MSG_COMBAT_XP_GAIN" then
         SyncToGameState(false)
+    elseif evt == "CHAT_MSG_SYSTEM" or evt == "CHAT_MSG_SPELL_SELF_BUFF" or
+        evt == "CHAT_MSG_SPELL_FRIENDLYPLAYER_BUFF" or evt == "CHAT_MSG_SPELL_PET_DAMAGE" or
+        evt == "CHAT_MSG_SPELL_PERIODIC_SELF_BUFFS" or evt == "CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_BUFFS" or
+        evt == "CHAT_MSG_SPELL_PERIODIC_PET_BUFFS" or evt == "CHAT_MSG_SPELL_PERIODIC_CREATURE_BUFFS" or
+        evt == "CHAT_MSG_SPELL_AURA_GONE_SELF" or evt == "CHAT_MSG_SPELL_AURA_GONE_PARTY" or
+        evt == "CHAT_MSG_SPELL_AURA_GONE_OTHER" then
+        HandleFeedEffectChatMessage(a1)
     elseif evt == "PET_BAR_UPDATE" or evt == "PET_UI_UPDATE" then
         SyncToGameState(false)
     end
@@ -977,6 +1141,17 @@ mainframe:RegisterEvent("UNIT_PET")
 mainframe:RegisterEvent("UNIT_PET_EXPERIENCE")
 mainframe:RegisterEvent("PLAYER_XP_UPDATE")
 mainframe:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
+mainframe:RegisterEvent("CHAT_MSG_SYSTEM")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_SELF_BUFF")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_FRIENDLYPLAYER_BUFF")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_PET_DAMAGE")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_SELF_BUFFS")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_BUFFS")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_PET_BUFFS")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_CREATURE_BUFFS")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_SELF")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_PARTY")
+mainframe:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_OTHER")
 mainframe:RegisterEvent("PET_BAR_UPDATE")
 mainframe:RegisterEvent("PET_UI_UPDATE")
 

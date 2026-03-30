@@ -9,6 +9,7 @@ A lightweight Forged WoW addon that improves Hunter pet status tracking through 
   - Yellow = Content
   - Red = Unhappy
   - Gray = No pet / unknown
+- Pet feed effect when fed
 - Pet XP bar (`current/max`), including max-level display
 - Pet info line: level + family (+ custom name when set)
 - Loyalty text line
@@ -27,15 +28,17 @@ A lightweight Forged WoW addon that improves Hunter pet status tracking through 
 ## Installation
 
 1. Close WoW.
-2. Copy the addon folder to:
+1. Copy the addon folder to:
    - `World of Warcraft/Interface/AddOns/Forged_PetHappiness`
-3. Ensure these files are inside that folder:
-  - `utils.lua`
-  - `diet.lua`
-  - `core.lua`
-   - `Forged_PetHappiness.toc`
-  - `README.md` (optional)
-4. Start WoW and enable **Forged Pet Happiness** in AddOns at character select.
+1. Ensure these files are inside that folder:
+
+- `utils.lua`
+- `diet.lua`
+- `core.lua`
+- `Forged_PetHappiness.toc`
+- `README.md` (optional)
+
+1. Start WoW and enable **Forged Pet Happiness** in AddOns at character select.
 
 ## Usage
 
